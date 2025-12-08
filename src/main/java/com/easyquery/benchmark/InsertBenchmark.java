@@ -1,6 +1,8 @@
 package com.easyquery.benchmark;
 
 import com.easyquery.benchmark.entity.User;
+import com.easyquery.benchmark.jooq.generated.tables.pojos.TUser;
+import com.easyquery.benchmark.jooq.generated.tables.records.TUserRecord;
 import com.easyquery.benchmark.hibernate.HibernateUser;
 import com.easyquery.benchmark.hibernate.HibernateUtil;
 import com.easy.query.core.api.client.EasyQueryClient;
@@ -19,7 +21,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
-import static org.jooq.impl.DSL.*;
+import static com.easyquery.benchmark.jooq.generated.Tables.T_USER;
 
 
 @BenchmarkMode(Mode.Throughput)
@@ -52,6 +54,10 @@ public class InsertBenchmark {
 
     @Setup(Level.Iteration)
     public void setupIteration() {
+        // 清理 Hibernate 缓存，避免一级缓存累积影响性能
+        if (entityManager != null) {
+            entityManager.clear();
+        }
         DatabaseInitializer.clearData();
     }
 
@@ -68,18 +74,16 @@ public class InsertBenchmark {
     @Benchmark
     public void jooqInsertSingle() {
         String id = UUID.randomUUID().toString();
-        com.easyquery.benchmark.jooq.JooqUser user = new com.easyquery.benchmark.jooq.JooqUser(
-                id, "user_" + id, "user@example.com", 25, "1234567890", "Test Address");
         
         jooqDsl.transaction(configuration -> {
             DSL.using(configuration)
-                    .insertInto(table("t_user"))
-                    .columns(
-                            field("id"), field("username"), field("email"),
-                            field("age"), field("phone"), field("address")
-                    )
-                    .values(user.getId(), user.getUsername(), user.getEmail(),
-                            user.getAge(), user.getPhone(), user.getAddress())
+                    .insertInto(T_USER)
+                    .set(T_USER.ID, id)
+                    .set(T_USER.USERNAME, "user_" + id)
+                    .set(T_USER.EMAIL, "user@example.com")
+                    .set(T_USER.AGE, 25)
+                    .set(T_USER.PHONE, "1234567890")
+                    .set(T_USER.ADDRESS, "Test Address")
                     .execute();
         });
     }
@@ -102,32 +106,21 @@ public class InsertBenchmark {
 
     @Benchmark
     public void jooqInsertBatch1000() {
-        List<com.easyquery.benchmark.jooq.JooqUser> users = new ArrayList<>();
+        List<TUserRecord> records = new ArrayList<>();
         for (int i = 0; i < 1000; i++) {
             String id = UUID.randomUUID().toString();
-            com.easyquery.benchmark.jooq.JooqUser user = new com.easyquery.benchmark.jooq.JooqUser(
-                    id, "user_" + id, "user@example.com", 25 + (i % 50), "1234567890", "Test Address");
-            users.add(user);
+            TUserRecord record = new TUserRecord();
+            record.setId(id);
+            record.setUsername("user_" + id);
+            record.setEmail("user@example.com");
+            record.setAge(25 + (i % 50));
+            record.setPhone("1234567890");
+            record.setAddress("Test Address");
+            records.add(record);
         }
         
         jooqDsl.transaction(configuration -> {
-            var batchQuery = DSL.using(configuration).batch(
-                    DSL.using(configuration).insertInto(table("t_user"))
-                            .columns(
-                                    field("id"), field("username"), field("email"),
-                                    field("age"), field("phone"), field("address")
-                            )
-                            .values((String) null, null, null, null, null, null)
-            );
-
-            for (com.easyquery.benchmark.jooq.JooqUser user : users) {
-                batchQuery.bind(
-                        user.getId(), user.getUsername(), user.getEmail(),
-                        user.getAge(), user.getPhone(), user.getAddress()
-                );
-            }
-
-            batchQuery.execute();
+            DSL.using(configuration).batchInsert(records).execute();
         });
     }
 
@@ -149,19 +142,20 @@ public class InsertBenchmark {
 
     @Benchmark
     public void hibernateInsertBatch1000() {
-        List<HibernateUser> users = new ArrayList<>();
-
         entityManager.getTransaction().begin();
         try {
             for (int i = 0; i < 1000; i++) {
                 String id = UUID.randomUUID().toString();
                 HibernateUser user = new HibernateUser(id, "user_" + id, "user@example.com", 25 + (i % 50), "1234567890", "Test Address");
-                users.add(user);
-            }
-
-            for (HibernateUser user : users) {
                 entityManager.persist(user);
+                
+                // 与 batch_size 配合，定期 flush 和 clear，避免内存积累
+                if (i > 0 && i % 50 == 0) {
+                    entityManager.flush();
+                    entityManager.clear();
+                }
             }
+            entityManager.flush(); // 最后再 flush 一次
             entityManager.getTransaction().commit();
         } catch (Exception e) {
             if (entityManager.getTransaction().isActive()) {

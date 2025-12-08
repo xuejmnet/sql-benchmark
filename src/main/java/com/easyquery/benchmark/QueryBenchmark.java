@@ -1,7 +1,7 @@
 package com.easyquery.benchmark;
 
 import com.easyquery.benchmark.entity.User;
-import com.easyquery.benchmark.jooq.JooqUser;
+import com.easyquery.benchmark.jooq.generated.tables.pojos.TUser;
 import com.easyquery.benchmark.hibernate.HibernateUser;
 import com.easyquery.benchmark.hibernate.HibernateUtil;
 import com.easy.query.api.proxy.client.DefaultEasyEntityQuery;
@@ -19,7 +19,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
-import static org.jooq.impl.DSL.*;
+import static com.easyquery.benchmark.jooq.generated.Tables.T_USER;
 
 
 @BenchmarkMode(Mode.Throughput)
@@ -59,6 +59,14 @@ public class QueryBenchmark {
         insertTestData();
     }
 
+    @Setup(Level.Iteration)
+    public void setupIteration() {
+        // 清理 Hibernate 一级缓存，避免缓存累积影响查询性能
+        if (entityManager != null) {
+            entityManager.clear();
+        }
+    }
+
     private void insertTestData() {
         for (int i = 0; i < 1000; i++) {
             String id = UUID.randomUUID().toString();
@@ -77,11 +85,10 @@ public class QueryBenchmark {
     }
 
     @Benchmark
-    public JooqUser jooqSelectById() {
-        return jooqDsl.select()
-                .from(table("t_user"))
-                .where(field("id").eq(testUserId))
-                .fetchOneInto(JooqUser.class);
+    public TUser jooqSelectById() {
+        return jooqDsl.selectFrom(T_USER)
+                .where(T_USER.ID.eq(testUserId))
+                .fetchOneInto(TUser.class);
     }
 
     @Benchmark
@@ -94,13 +101,12 @@ public class QueryBenchmark {
     }
 
     @Benchmark
-    public List<JooqUser> jooqSelectList() {
-        return jooqDsl.select()
-                .from(table("t_user"))
-                .where(field("age").ge(25))
-                .orderBy(field("username").desc())
+    public List<TUser> jooqSelectList() {
+        return jooqDsl.selectFrom(T_USER)
+                .where(T_USER.AGE.ge(25))
+                .orderBy(T_USER.USERNAME.desc())
                 .limit(10)
-                .fetchInto(JooqUser.class);
+                .fetchInto(TUser.class);
     }
 
     @Benchmark
@@ -116,8 +122,8 @@ public class QueryBenchmark {
     @Benchmark
     public Integer jooqCount() {
         return jooqDsl.selectCount()
-                .from(table("t_user"))
-                .where(field("age").ge(25).and(field("age").le(35)))
+                .from(T_USER)
+                .where(T_USER.AGE.ge(25).and(T_USER.AGE.le(35)))
                 .fetchOne(0, Integer.class);
     }
 

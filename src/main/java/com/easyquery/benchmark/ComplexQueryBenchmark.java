@@ -2,6 +2,7 @@ package com.easyquery.benchmark;
 
 import com.easyquery.benchmark.entity.Order;
 import com.easyquery.benchmark.entity.User;
+import com.easyquery.benchmark.jooq.generated.tables.pojos.TUser;
 import com.easyquery.benchmark.hibernate.HibernateUser;
 import com.easyquery.benchmark.hibernate.HibernateUtil;
 import com.easy.query.api.proxy.client.DefaultEasyEntityQuery;
@@ -20,7 +21,8 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
-import static org.jooq.impl.DSL.*;
+import static com.easyquery.benchmark.jooq.generated.Tables.T_ORDER;
+import static com.easyquery.benchmark.jooq.generated.Tables.T_USER;
 
 
 @BenchmarkMode(Mode.Throughput)
@@ -59,6 +61,14 @@ ComplexQueryBenchmark {
         insertTestData();
     }
 
+    @Setup(Level.Iteration)
+    public void setupIteration() {
+        // 清理 Hibernate 一级缓存，避免缓存累积影响复杂查询性能
+        if (entityManager != null) {
+            entityManager.clear();
+        }
+    }
+
     private void insertTestData() {
         for (int i = 0; i < 500; i++) {
             String userId = UUID.randomUUID().toString();
@@ -93,21 +103,14 @@ ComplexQueryBenchmark {
     }
 
     @Benchmark
-    public List<com.easyquery.benchmark.jooq.JooqUser> jooqJoinQuery() {
-        return jooqDsl.selectDistinct(
-                field("t_user.id").as("id"),
-                field("t_user.username").as("username"),
-                field("t_user.email").as("email"),
-                field("t_user.age").as("age"),
-                field("t_user.phone").as("phone"),
-                field("t_user.address").as("address")
-        )
-                .from(table("t_user"))
-                .join(table("t_order")).on(field("t_user.id").eq(field("t_order.user_id")))
-                .where(field("t_order.status").eq(1)
-                        .and(field("t_order.amount").ge(new BigDecimal("100"))))
+    public List<TUser> jooqJoinQuery() {
+        return jooqDsl.selectDistinct(T_USER.fields())
+                .from(T_USER)
+                .join(T_ORDER).on(T_USER.ID.eq(T_ORDER.USER_ID))
+                .where(T_ORDER.STATUS.eq(1)
+                        .and(T_ORDER.AMOUNT.ge(new BigDecimal("100"))))
                 .limit(20)
-                .fetchInto(com.easyquery.benchmark.jooq.JooqUser.class);
+                .fetchInto(TUser.class);
     }
 
     @Benchmark
@@ -120,8 +123,8 @@ ComplexQueryBenchmark {
     @Benchmark
     public long jooqAggregation() {
         Integer count = jooqDsl.selectCount()
-                .from(table("t_order"))
-                .where(field("status").eq(1))
+                .from(T_ORDER)
+                .where(T_ORDER.STATUS.eq(1))
                 .fetchOne(0, Integer.class);
         return count != null ? count : 0;
     }

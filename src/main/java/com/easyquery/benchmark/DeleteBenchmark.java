@@ -17,7 +17,7 @@ import org.openjdk.jmh.annotations.*;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
-import static org.jooq.impl.DSL.*;
+import static com.easyquery.benchmark.jooq.generated.Tables.T_USER;
 
 
 @BenchmarkMode(Mode.Throughput)
@@ -53,6 +53,10 @@ public class DeleteBenchmark {
 
     @Setup(Level.Iteration)
     public void setupIteration() {
+        // 清理 Hibernate 一级缓存，避免缓存累积影响删除性能
+        if (entityManager != null) {
+            entityManager.clear();
+        }
         DatabaseInitializer.clearData();
         // 使用中立的 JDBC 方式插入新数据（确保公平性）
         for (int i = 0; i < 50; i++) {
@@ -77,8 +81,8 @@ public class DeleteBenchmark {
     public int jooqDeleteByCondition() {
         return jooqDsl.transactionResult(configuration -> {
             return DSL.using(configuration)
-                    .deleteFrom(table("t_user"))
-                    .where(field("age").ge(40))
+                    .deleteFrom(T_USER)
+                    .where(T_USER.AGE.ge(40))
                     .execute();
         });
     }

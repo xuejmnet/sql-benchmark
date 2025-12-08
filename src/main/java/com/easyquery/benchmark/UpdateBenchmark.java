@@ -18,7 +18,7 @@ import org.openjdk.jmh.annotations.*;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
-import static org.jooq.impl.DSL.*;
+import static com.easyquery.benchmark.jooq.generated.Tables.T_USER;
 
 
 @BenchmarkMode(Mode.Throughput)
@@ -57,6 +57,14 @@ public class UpdateBenchmark {
         insertTestData();
     }
 
+    @Setup(Level.Iteration)
+    public void setupIteration() {
+        // 清理 Hibernate 一级缓存，避免缓存累积影响更新性能
+        if (entityManager != null) {
+            entityManager.clear();
+        }
+    }
+
     private void insertTestData() {
         for (int i = 0; i < 100; i++) {
             String id = UUID.randomUUID().toString();
@@ -85,9 +93,9 @@ public class UpdateBenchmark {
     public int jooqUpdateById() {
         return jooqDsl.transactionResult(configuration -> {
             return DSL.using(configuration)
-                    .update(table("t_user"))
-                    .set(field("age"), 99)
-                    .where(field("id").eq(testUserId))
+                    .update(T_USER)
+                    .set(T_USER.AGE, 99)
+                    .where(T_USER.ID.eq(testUserId))
                     .execute();
         });
     }
@@ -110,9 +118,9 @@ public class UpdateBenchmark {
     public int jooqUpdateBatch() {
         return jooqDsl.transactionResult(configuration -> {
             return DSL.using(configuration)
-                    .update(table("t_user"))
-                    .set(field("age"), 88)
-                    .where(field("age").ge(50))
+                    .update(T_USER)
+                    .set(T_USER.AGE, 88)
+                    .where(T_USER.AGE.ge(50))
                     .execute();
         });
     }
@@ -121,12 +129,10 @@ public class UpdateBenchmark {
     public int hibernateUpdateById() {
         entityManager.getTransaction().begin();
         try {
-            HibernateUser user = entityManager.find(HibernateUser.class, testUserId);
-            int result = 0;
-            if (user != null) {
-                user.setAge(99);
-                result = 1;
-            }
+            Query query = entityManager.createQuery("UPDATE HibernateUser u SET u.age = :age WHERE u.id = :id");
+            query.setParameter("age", 99);
+            query.setParameter("id", testUserId);
+            int result = query.executeUpdate();
             entityManager.getTransaction().commit();
             return result;
         } catch (Exception e) {
