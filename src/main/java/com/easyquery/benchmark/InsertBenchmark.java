@@ -92,7 +92,7 @@ public class InsertBenchmark {
                 User user = new User(id, "user_" + id, "user@example.com", 25 + (i % 50), "1234567890", "Test Address");
                 users.add(user);
             }
-            easyEntityQuery.insertable(users).executeRows();
+            easyEntityQuery.insertable(users).batch(true).executeRows();
             transaction.commit();
         }
     }
