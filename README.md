@@ -3,56 +3,131 @@
 ## 🏆 Benchmark Results
 
 **Test Environment:**
-- **OS**: Windows 10
-- **JDK**: OpenJDK 21.0.9 (64-Bit Server VM)
+- **OS**: Windows 10 (Build 26200)
+- **JDK**: OpenJDK 21.0.9+10-LTS (64-Bit Server VM)
 - **Database**: H2 2.2.224 (In-Memory)
 - **Connection Pool**: HikariCP 4.0.3
+- **JMH**: 1.37
 
 ### Performance Summary (ops/s - higher is better)
 
-| Test Scenario | easy-query | JOOQ | Performance Ratio |
-|--------------|------------|------|-------------------|
-| **Query Operations** |
-| Query by ID | 42,269 ± 216,104 | 13,666 ± 28,694 | 🚀 **3.09x faster** |
-| Conditional Query | 92,287 ± 496,991 | 41,531 ± 116,225 | 🚀 **2.22x faster** |
-| COUNT Query | 27,351 ± 84,573 | 114,499 ± 399,596 | ❌ **0.24x slower** |
-| **Insert Operations** |
-| Single Insert | 95,844 ± 11,417 | 25,939 ± 93,497 | 🚀 **3.70x faster** |
-| Batch Insert (10) | 4,016 ± 17,311 | 9,972 ± 1,065 | ❌ **0.40x slower** |
-| **Update Operations** |
-| Update by ID | 190,674 ± 5,164 | 121,304 ± 257,883 | ✅ **1.57x faster** |
-| Batch Update | 4,608 ± 7,163 | 5,351 ± 872 | ⚖️ **0.86x comparable** |
-| **Delete Operations** |
-| Delete by Condition | 63,610 ± 83,836 | 40,436 ± 81,054 | ✅ **1.57x faster** |
-| **Complex Operations** |
-| JOIN Query | 15,183 ± 34,975 | 5,751 ± 294 | 🚀 **2.64x faster** |
-| Aggregation (COUNT) | 136,926 ± 595,741 | 19,131 ± 59,396 | 🚀 **7.16x faster** |
+#### 📊 Query Operations
 
-### Key Findings
+| Test Case | EasyQuery | Hibernate | JOOQ | Winner |
+|-----------|-----------|-----------|------|--------|
+| **Select by ID** | 305,207 ± 10,512 | 227,301 ± 10,170 | 160,269 ± 3,664 | 🥇 **EasyQuery** 1.34x |
+| **Select List** | 266,390 ± 3,978 | 364,967 ± 15,355 | 80,236 ± 3,493 | 🥇 **Hibernate** 1.37x |
+| **COUNT Query** | 412,933 ± 7,923 | 487,353 ± 15,942 | 243,099 ± 7,318 | 🥇 **Hibernate** 1.18x |
 
-✅ **easy-query advantages:**
-- **Complex Aggregation queries**: 7.16x faster than JOOQ
-- **Single insert operations**: 3.70x faster than JOOQ
-- **Simple queries by ID**: 3.09x faster than JOOQ
-- **JOIN queries**: 2.64x faster than JOOQ
-- **Conditional queries**: 2.22x faster than JOOQ
-- **Delete operations**: 1.57x faster than JOOQ
-- **Update by ID**: 1.57x faster than JOOQ
+#### ✏️ Insert Operations
 
-❌ **JOOQ advantages:**
-- **COUNT queries**: 4.19x faster than easy-query
-- **Batch insert operations**: 2.48x faster than easy-query
+| Test Case | EasyQuery | Hibernate | JOOQ | Winner |
+|-----------|-----------|-----------|------|--------|
+| **Single Insert** | 82,239 ± 1,547 | 372 ± 50 | 66,391 ± 2,002 | 🥇 **EasyQuery** 221x vs Hibernate |
+| **Batch Insert (1000)** | 60 ± 17 | 66 ± 3 | 54 ± 4 | 🥇 **Hibernate** 1.10x |
 
-⚖️ **Comparable performance:**
-- **Batch updates**: Similar performance (86% of JOOQ)
+#### 🔄 Update Operations
 
-💡 **Overall**: easy-query shows superior performance in most single-record operations and complex queries (especially aggregations and joins). JOOQ demonstrates better performance in simple COUNT queries and batch insert operations.
+| Test Case | EasyQuery | Hibernate | JOOQ | Winner |
+|-----------|-----------|-----------|------|--------|
+| **Update by ID** | 111,131 ± 16,518 | 55,648 ± 32,258 | 38,046 ± 23,627 | 🥇 **EasyQuery** 2.0x |
+| **Batch Update** | 4,724 ± 354 | 781 ± 35 | 2,089 ± 1,208 | 🥇 **EasyQuery** 6.0x |
 
-⚠️ **Important Note on Data Stability**: The original test results showed very high variance. This has been improved with the following optimizations:
-- Increased warmup iterations (from 3 to 5) and time (from 1s to 3s)
-- Increased measurement iterations (from 5 to 10) and time (from 2s to 3s)
-- Using multiple JVM forks (from 1 to 3) for more stable results
-- All frameworks now run in **autocommit mode without explicit transaction management** for fair comparison
+#### 🗑️ Delete Operations
+
+| Test Case | EasyQuery | Hibernate | JOOQ | Winner |
+|-----------|-----------|-----------|------|--------|
+| **Delete by Condition** | 108,395 ± 82,216 | 285,460 ± 7,670 | 221,337 ± 56,080 | 🥇 **Hibernate** 2.6x |
+
+#### 🔗 Complex Query Operations
+
+| Test Case | EasyQuery | Hibernate | JOOQ | Winner |
+|-----------|-----------|-----------|------|--------|
+| **JOIN Query** | 163,606 ± 4,689 | 208,591 ± 19,818 | 6,332 ± 407 | 🥇 **Hibernate** 1.27x |
+| **Aggregation** | 408,164 ± 16,437 | 468,132 ± 17,908 | 162,432 ± 74,204 | 🥇 **Hibernate** 1.15x |
+
+### 📈 Key Findings
+
+#### 🏆 Overall Performance Rating
+
+| Framework | Strengths | Weaknesses | Score |
+|-----------|-----------|------------|-------|
+| **EasyQuery** | ⭐⭐⭐⭐ | Single Insert, Updates, ID Query | Aggregation, Delete |
+| **Hibernate** | ⭐⭐⭐⭐ | Complex Queries, Delete, List Query | Single Insert (372 ops/s!) |
+| **JOOQ** | ⭐⭐⭐ | - | JOIN Query, List Query |
+
+#### ✅ EasyQuery Advantages
+
+1. **🚀 Exceptional Write Performance**
+   - **Single Insert**: 221x faster than Hibernate, 1.24x faster than JOOQ
+   - **Update by ID**: 2x faster than Hibernate, 2.9x faster than JOOQ
+   - **Batch Update**: 6x faster than Hibernate, 2.3x faster than JOOQ
+
+2. **⚡ Excellent for Single Record Operations**
+   - **Select by ID**: 1.34x faster than Hibernate, 1.9x faster than JOOQ
+   - Best choice for CRUD-intensive applications
+
+3. **📊 Stable Performance**
+   - Consistent results across all write operations
+   - Low standard deviation in most benchmarks
+
+#### ✅ Hibernate Advantages
+
+1. **🔍 Superior Read Performance**
+   - **List Query**: 1.37x faster than EasyQuery, 4.5x faster than JOOQ
+   - **COUNT Query**: 1.18x faster than EasyQuery, 2x faster than JOOQ
+   - **Delete**: 2.6x faster than EasyQuery
+
+2. **🔗 Better Complex Query Handling**
+   - **JOIN Query**: 1.27x faster than EasyQuery, 33x faster than JOOQ
+   - **Aggregation**: 1.15x faster than EasyQuery, 2.9x faster than JOOQ
+
+3. **⚠️ Critical Weakness**
+   - Single insert performance is extremely poor (372 ops/s)
+   - Likely due to entity management overhead
+
+#### ⚠️ JOOQ Limitations
+
+1. **🐌 Poor JOIN Performance**: 6,332 ops/s (26x slower than EasyQuery)
+2. **📉 Weak List Query**: 80,236 ops/s (3.3x slower than EasyQuery)
+3. **💡 Recommendation**: Needs optimization for complex queries
+
+### 🎯 Usage Recommendations
+
+| Use Case | Recommended Framework | Reason |
+|----------|----------------------|--------|
+| **Write-Heavy Apps** | 🥇 EasyQuery | 221x faster single insert, 6x faster batch update |
+| **Read-Heavy Apps** | 🥇 Hibernate | Superior list query and aggregation performance |
+| **Mixed Workload** | 🥇 EasyQuery | Better balance across all operations |
+| **Complex Queries** | 🥇 Hibernate | Better JOIN and aggregation handling |
+| **Type-Safe SQL** | ⚖️ JOOQ/EasyQuery | Both offer compile-time safety |
+
+### ⚠️ Important Notes
+
+- All frameworks run in **autocommit mode** without explicit transaction management for fair comparison
+- **Test data varies by benchmark**:
+  - Query operations: 1,000 users pre-loaded
+  - Complex queries: 500 users + ~1,750 orders pre-loaded
+  - Update operations: 100 users per iteration
+  - Delete operations: 50 users per iteration
+  - Insert operations: starts from empty database
+- Connection pool: HikariCP with 10 max connections, 5 min idle
+- Benchmark stability achieved through:
+  - **Warmup**: 5 iterations × 3 seconds
+  - **Measurement**: 10 iterations × 3 seconds
+  - **Forks**: 3 JVM forks for statistical reliability
+
+### 📢 Disclaimer
+
+**About Test Fairness**: Due to limited time and resources, the author may not have deep expertise in all the optimization mechanisms of each ORM framework. If you believe any benchmark is unfair or not optimized properly, you are **welcome and encouraged** to:
+
+- 🔧 Fork this repository
+- 📝 Modify the benchmark code with your optimizations
+- 🚀 Re-run the tests and share your results
+
+**Author's Confidence**: Despite these limitations, we are confident that **EasyQuery delivers excellent performance** in real-world scenarios. The benchmarks demonstrate its strengths, but we remain open to improvements and community feedback.
+
+💡 **Contributions are welcome!** If you find better ways to optimize any framework's performance, please submit a pull request. Fair comparison benefits everyone in the community.
 
 ---
 
