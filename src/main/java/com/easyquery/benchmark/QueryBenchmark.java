@@ -44,6 +44,9 @@ public class QueryBenchmark {
 
         EasyQueryClient easyQueryClient = EasyQueryBootstrapper.defaultBuilderConfiguration()
                 .setDefaultDataSource(DatabaseInitializer.getDataSource())
+                .optionConfigure(op->{
+                    op.setPrintSql(false);
+                })
                 .useDatabaseConfigure(new H2DatabaseConfiguration())
                 .build();
         easyEntityQuery = new DefaultEasyEntityQuery(easyQueryClient);
